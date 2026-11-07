@@ -127,8 +127,11 @@ X-Api-Key: kgg_...
 | `count` | no | `4` | 1–10 |
 | `key` (fragment) | no | – | Without it, only the stats strip shows |
 
-The key sits in the URL fragment, so browsers never send it to the overlay host. It still sits in
-the OBS settings, which is why it is read-only.
+The key sits in the URL fragment, so browsers never send it to the overlay host. OBS loads the
+page without the key. The page's JavaScript then reads it from `location.hash` and calls the API
+with `fetch()`, putting the key in the `X-Api-Key` header. OBS needs no header setting for this:
+the browser source is Chromium, and the page makes the API call itself. The key still sits in the
+OBS settings, which is why it is read-only.
 
 ## 5. Formatting
 
