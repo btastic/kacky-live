@@ -2,18 +2,20 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-FF7800)](LICENSE)
 
-Clean, read-only broadcast overlays for [Kacky](https://kacky.gg) events. Kacky Live gives streamers an always-current board for the active map, top records, server queue, and top donors—right inside OBS without needing an extra browser window open.
+Clean, read-only stream overlays for [Kacky](https://kacky.gg) events, built for viewers. Kacky Live answers what chat asks most: *when is the streamer's map up?* and *how far are they?* It shows the streamer's favourite maps coming up on the servers, plus their event progress, right inside OBS.
 
-Runs entirely in the browser on top of the public KackyGG API ([`docs/API-NOTES.md`](docs/API-NOTES.md)). Because it is client-only and read-only, anyone can run it locally, test against live data, and contribute widgets without needing backend credentials or server access.
+It complements Kontrol, the in-game server UI, rather than repeating it: the current map, top records, linked servers and donors are already on screen in game.
 
-**Current Status:** Planning ([Phase 0](https://github.com/kacky-code/kacky-live/milestone/1)). We are finalizing the layout spec and wireframe before scaffolding the app. Check the [open issues](https://github.com/kacky-code/kacky-live/issues) to weigh in.
+Runs entirely in the browser on top of the KackyGG API ([`docs/API-NOTES.md`](docs/API-NOTES.md)). Stats come from public endpoints; the favourites schedule uses a read-only key the streamer creates on their kacky.gg profile.
+
+**Current Status:** Planning ([Phase 0](https://github.com/kacky-code/kacky-live/milestone/1)). The spec ([`docs/specs/overlay-mvp.md`](docs/specs/overlay-mvp.md)) is up for review before scaffolding the app. Check the [open issues](https://github.com/kacky-code/kacky-live/issues) to weigh in.
 
 ## Roadmap
 
 | Phase | Goal | Status |
 |---|---|---|
-| [Phase 0: spec and mockup](https://github.com/kacky-code/kacky-live/milestone/1) | Finalize HUD layout, polling rates, and fallback states | In progress |
-| [Phase 1: overlay MVP](https://github.com/kacky-code/kacky-live/milestone/2) | Ship the 1920x1080 OBS browser source with core widgets | Planned |
+| [Phase 0: spec and mockup](https://github.com/kacky-code/kacky-live/milestone/1) | Agree on widgets, the overlay key, polling and fallback states | In progress |
+| [Phase 1: overlay MVP](https://github.com/kacky-code/kacky-live/milestone/2) | Ship the 1920x1080 OBS browser source with "Up next" and the stats strip | Planned |
 | [Phase 2: Twitch panel extension](https://github.com/kacky-code/kacky-live/milestone/3) | Viewer-facing Twitch panel reusing the Phase 1 client | Planned |
 
 ## What We're Building
@@ -23,41 +25,37 @@ Runs entirely in the browser on top of the public KackyGG API ([`docs/API-NOTES.
 A `1920x1080` transparent browser source for OBS, configured via URL parameters:
 
 ```text
-https://<host>/overlay?server=<server-login>&player=<player-login>
+https://<host>/overlay?player=<player-id>&types=hard,impossible&count=4#key=<overlay-key>
 ```
 
-- `server` (required): The Kacky server login to track.
-- `player` (optional): Highlights the streamer's personal best in the top 5 records.
+- `player` (required): The streamer's KackyGG player id, picked by name on the `/config` page.
+- `types` (optional): Which favourite types to show (`generic`, `easy`, `medium`, `hard`, `impossible`). Default: all.
+- `count` (optional): How many maps to show, 1–10. Default: 4.
+- `key` (optional, after `#`): The streamer's read-only overlay key. Without it, only the stats strip shows. Being after `#`, it is never sent to the overlay host.
 
 ```text
-+-------------------------------------------------------------------------+
-| [KACKY #7 - DAY 3 OF 15]                                   1920 x 1080  |
-|                                                                         |
-| +---------------------+   +---------------------+   +-----------------+ |
-| | CURRENT MAP #42     |   | TOP 5 RECORDS       |   | UP NEXT         | |
-| | Author: 0:14.210    |   | 1. PlayerOne  13.4s |   | #43 (5 min)     | |
-| | WR:     0:13.412    |   | 2. PlayerTwo  13.8s |   | #44             | |
-| +---------------------+   | 3. You        14.1s |   +-----------------+ |
-|                           +---------------------+                       |
-|                                                     +-----------------+ |
-|                                                     | TOP SUPPORTERS  | |
-| (Transparent game area for Trackmania runs)         | SupporterA €50  | |
-|                                                     +-----------------+ |
-+-------------------------------------------------------------------------+
++------------------------------+
+| UP NEXT                      |
+| #464  S8   live · 4:12 left  |
+| #503  S7   in 9:40           |
+| #486  S1   in 31:05          |
++------------------------------+
+
+KR7 · 51 / 75 finished · rank #3 · 2 WR        898 finishes overall
 ```
 
-#### Core Widgets
+#### Widgets
 
-- **Event Header:** Active event title and progress (`Day N of M`).
-- **Map Card:** Current map number, author time, and world record.
-- **Top 5 Records:** Live leaderboard for the active map.
-- **Server Queue:** Next maps coming up on the server.
-- **Top Donors:** Community supporters over the last 90 days.
+- **Up next:** The streamer's favourite maps on the live edition servers, soonest first, with server and countdown. Streamers mark favourites in game and focus on 3–4 maps at a time, so the list stays short.
+- **Stats strip:** Maps finished in the current event, event rank, world records, and overall finishes.
+
+During hunting, maps play in the order players vote for, so there is no schedule: the overlay shows the stats strip only.
 
 #### Stream-Safe by Design
 
 - **Quiet visuals:** High contrast for readability over Trackmania stadium concrete and dirt, with zero distracting animations during runs.
-- **Graceful fallbacks:** If an API request times out or a server restarts, the overlay holds the last known good state. It never flashes error banners or stack traces on stream.
+- **Graceful fallbacks:** If an API request times out or a server restarts, the overlay holds the last known good state and keeps counting down. It never flashes error banners or stack traces on stream.
+- **Safe to leak:** The overlay key is read-only. If it ends up in a screenshot of OBS settings, nobody can change anything with it.
 
 ### Phase 2: Twitch Panel Extension
 
@@ -68,12 +66,12 @@ Once the OBS overlay is proven on live streams, Phase 2 reuses the same client l
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) – Workflow and PR guidelines.
 - [`docs/API-NOTES.md`](docs/API-NOTES.md) – Public KackyGG `/v1` endpoints, fields, and polling intervals.
 - [`docs/SPEC-TEMPLATE.md`](docs/SPEC-TEMPLATE.md) – Structure for layout and widget specs.
-- [`docs/specs/overlay-mvp.md`](docs/specs/overlay-mvp.md) – Phase 1 overlay spec (proposal for #1).
+- [`docs/specs/overlay-mvp.md`](docs/specs/overlay-mvp.md) – Phase 1 streamer overlay spec (proposal for #1).
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) – Community guidelines.
 
 ## Contributing
 
-We want Kacky Live to be easy and fun to build together. Jump into the layout discussion in Issue [#1](https://github.com/kacky-code/kacky-live/issues/1), or pick up documentation in Issue [#10: OBS setup guide & URL generator page](https://github.com/kacky-code/kacky-live/issues/10).
+We want Kacky Live to be easy and fun to build together. Jump into the spec discussion in Issue [#1](https://github.com/kacky-code/kacky-live/issues/1), or pick up documentation in Issue [#10: OBS setup guide & URL generator page](https://github.com/kacky-code/kacky-live/issues/10).
 
 - Browse [`good first issue`](https://github.com/kacky-code/kacky-live/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) and [`help wanted`](https://github.com/kacky-code/kacky-live/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
 - Check [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
