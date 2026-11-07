@@ -25,11 +25,10 @@ Runs entirely in the browser on top of the KackyGG API ([`docs/API-NOTES.md`](do
 A `1920x1080` transparent browser source for OBS, configured via URL parameters:
 
 ```text
-https://<host>/overlay?player=<player-id>&types=hard,impossible&count=4#key=<overlay-key>
+https://<host>/overlay?player=<player-id>#key=<overlay-key>
 ```
 
 - `player` (required): The streamer's KackyGG player id, picked by name on the `/config` page.
-- `types` (optional): Which favourite types to show (`generic`, `easy`, `medium`, `hard`, `impossible`). Default: all.
 - `count` (optional): How many maps to show, 1–10. Default: 4.
 - `key` (optional, after `#`): The streamer's read-only overlay key. Without it, only the stats strip shows. Being after `#`, it is never sent to the overlay host.
 
@@ -46,7 +45,7 @@ KR7 · 51 / 75 finished · rank #3 · 2 WR        898 finishes overall
 
 #### Widgets
 
-- **Up next:** The streamer's favourite maps on the live edition servers, soonest first, with server and countdown. Streamers mark favourites in game and focus on 3–4 maps at a time, so the list stays short.
+- **Up next:** The streamer's favourite maps on the live edition servers, soonest first, with server and countdown. Streamers mark the maps of their current rotation as favourites in Kontrol, so the list stays short. Every favourite counts, whatever marker it has, and there is nothing to configure.
 - **Stats strip:** Maps finished in the current event, event rank, world records, and overall finishes.
 
 During hunting, maps play in the order players vote for, so there is no schedule: the overlay shows the stats strip only.

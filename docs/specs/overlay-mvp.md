@@ -17,9 +17,16 @@ Kacky Reloaded 7 (event `26`).
 
 ### Why favourites drive it
 
-A streamer focuses on 3–4 maps at a time. With 25 maps left, a list of every unfinished map is
-noise. The streamer marks maps as favourites in game (Kontrol), with a type: `generic`, `easy`,
-`medium`, `hard`, `impossible`. The overlay shows only the types the streamer picks.
+A streamer focuses on a handful of maps at a time. With 25 maps left, a list of every unfinished
+map is noise. Competitive players pick a rotation of maps they like and whose slots line up, and
+mark them as favourites in game (Kontrol). Maps they are not currently trying usually stay
+unmarked, so the favourites *are* the rotation.
+
+Kontrol stores a marker type with each favourite (`generic`, `easy`, `medium`, `hard`,
+`impossible`), but streamers use them loosely: some only use `generic`, others use a marker for
+"luck maps" or a heart for maps they like. The type says nothing reliable about difficulty, so the
+overlay shows **every** favourite and never filters by type. The streamer configures nothing
+beyond marking maps in game.
 
 ### Event phases
 
@@ -120,14 +127,15 @@ The streamer's favourites are private. Their schedule comes from KackyGG's `Serv
 playlist from kontrol and adds the time limit plus a 60 s gap per map change.
 
 ```text
-GET /v1/overlay/nextmaps?types=hard,impossible&count=4
+GET /v1/overlay/nextmaps?count=4
 X-Api-Key: kgg_...
 ```
 
 | Query | Default | Rule |
 |---|---|---|
-| `types` | all types | Comma list of favourite types |
 | `count` | `4` | 1–10 |
+
+All favourite types are included. Unlike `!nextmaps`, there is no type filter.
 
 ```jsonc
 {
@@ -137,7 +145,7 @@ X-Api-Key: kgg_...
     {
       "mapNumber": 464,
       "mapUid": "…",
-      "favoriteType": "hard",
+      "favoriteType": "generic",  // the streamer's marker, passed through, never filtered
       "family": "KR",
       "server": { "login": "…", "tag": "S8" },
       "state": "live",            // live | next | later
@@ -159,14 +167,13 @@ X-Api-Key: kgg_...
 ## 4. URL
 
 ```text
-/overlay?player=842&types=hard,impossible&count=4#key=kgg_...
+/overlay?player=842#key=kgg_...
 ```
 
 | Param | Required | Default | Rule |
 |---|---|---|---|
 | `player` | yes | – | KackyGG player id, picked on `/config` by name or login |
-| `types` | no | all | Passed through to the endpoint |
-| `count` | no | `4` | 1–10 |
+| `count` | no | `4` | 1–10. Rarely needed; the default fits the panel |
 | `edition` | no | detected | Hunting only, e.g. `KR6`. Overrides the detected edition (proposal) |
 | `key` (fragment) | no | – | Without it, only the stats strip shows |
 
@@ -208,6 +215,8 @@ Never render error text, status codes or stack traces.
 ## Later
 
 - **Alert:** a row flashes once when its map is 30 s from starting.
+- **Marker icon:** show the streamer's own Kontrol marker (heart, luck, …) next to a row, as a
+  personal touch for viewers. Display only, never a filter.
 - **Overlapping favourites:** two favourites live or starting within a few minutes of each other
   on different servers. Decide how to show the clash (grouping, a marker, or order only).
 - **Twitch panel:** the same data for viewers below the stream.
