@@ -85,6 +85,23 @@ Hunting KR6 · 60 / 75 finished                 898 finishes overall
   in `/servers/live`. If the server is not in that list, the current map is unknown and the
   overlay falls back to `&edition=KR6` from the URL, else hides the edition part.
 
+### Mockup
+
+Rendered from [`mockup/overlay.html`](mockup/overlay.html) (`?state=live|hunting|alert`) with
+illustrative numbers. The page is transparent; the grey backdrop only stands in for the game.
+
+**Live edition:** stats strip and up next.
+
+![Live edition](mockup/overlay-live.png)
+
+**Hunting:** stats for the hunted edition, no schedule.
+
+![Hunting](mockup/overlay-hunting.png)
+
+**Alert (later):** a favourite 30 s from starting.
+
+![Alert](mockup/overlay-alert.png)
+
 ## 3. Data
 
 ### 3.1 Public endpoints (no key)

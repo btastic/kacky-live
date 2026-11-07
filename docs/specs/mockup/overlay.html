@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kacky Live overlay mockup</title>
+<!--
+  Static mockup for the overlay spec (docs/specs/overlay-mvp.md). Not app code.
+
+  Query params:
+    state = live (default) | hunting | alert
+    bg    = optional image URL shown behind the overlay, for local previews only
+    plain = 1 shows a neutral backdrop instead of transparency
+-->
+<style>
+  :root {
+    --panel: rgba(10, 10, 14, 0.74);
+    --panel-edge: rgba(255, 255, 255, 0.08);
+    --text: #f4f4f6;
+    --muted: #a3a3ad;
+    --accent: #ff7800;
+    --live: #3ddc84;
+    --next: #ffc83d;
+    --later: #ff5a5a;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+  body {
+    position: relative;
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    background-size: cover;
+  }
+  body.plain {
+    background:
+      linear-gradient(135deg, #5d6470 0%, #8b919b 45%, #b9a27c 100%);
+  }
+
+  .panel {
+    position: absolute;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Stats strip */
+  .strip {
+    left: 380px; top: 14px;
+    height: 52px;
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 18px 0 8px;
+    font-size: 20px;
+  }
+  .badge {
+    background: var(--accent); color: #111;
+    font-weight: 700; font-size: 16px; letter-spacing: 0.06em;
+    padding: 6px 10px; border-radius: 6px;
+    white-space: nowrap;
+  }
+  .progress { display: flex; align-items: center; gap: 10px; }
+  .bar { width: 120px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.14); overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .sep { width: 1px; height: 22px; background: var(--panel-edge); }
+  .strip b { font-weight: 650; }
+  .strip .muted { color: var(--muted); }
+  .strip .overall { margin-left: 14px; white-space: nowrap; }
+
+  /* Up next */
+  .next {
+    left: 24px; top: 724px;
+    width: 400px;
+    padding: 14px 16px 10px;
+  }
+  .next h2 {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .next h2 span { font-weight: 500; letter-spacing: 0.04em; font-size: 14px; }
+  .row {
+    display: grid; grid-template-columns: 14px 74px 44px 1fr;
+    align-items: center; gap: 8px;
+    height: 44px; padding: 0 10px;
+    border-radius: 7px;
+    font-size: 21px;
+  }
+  .row + .row { margin-top: 4px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .live .dot { background: var(--live); }
+  .nexts .dot { background: var(--next); }
+  .later .dot { background: var(--later); }
+  .map { font-weight: 700; }
+  .srv { color: var(--muted); font-size: 17px; }
+  .when { text-align: right; white-space: nowrap; }
+  .when small { color: var(--muted); font-size: 17px; margin-right: 6px; }
+  .live { background: rgba(61, 220, 132, 0.10); }
+  .alerting { outline: 2px solid var(--accent); background: rgba(255, 120, 0, 0.16); }
+  .alerting .when { color: var(--accent); font-weight: 700; }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="panel strip" id="strip"></div>
+
+<div class="panel next" id="next">
+  <h2>UP NEXT <span>hard · impossible</span></h2>
+  <div id="rows"></div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const state = params.get('state') || 'live';
+  if (params.get('bg')) document.body.style.backgroundImage = `url("${params.get('bg')}")`;
+  else if (params.get('plain') === '1') document.body.classList.add('plain');
+
+  // Illustrative numbers, shaped like the API responses in the spec.
+  const stats = {
+    live:    { badge: 'KR7', done: 51, total: 75, rank: 3, wr: 2, overall: 898 },
+    alert:   { badge: 'KR7', done: 51, total: 75, rank: 3, wr: 2, overall: 898 },
+    hunting: { badge: 'HUNTING KR6', done: 60, total: 75, overall: 898 },
+  }[state];
+
+  const rows = {
+    live: [
+      { map: 464, srv: 'S8', state: 'live',  secs: 252 },
+      { map: 503, srv: 'S7', state: 'next',  secs: 580 },
+      { map: 486, srv: 'S1', state: 'later', secs: 1865 },
+    ],
+    alert: [
+      { map: 503, srv: 'S7', state: 'next',  secs: 28, alert: true },
+      { map: 486, srv: 'S1', state: 'later', secs: 1313 },
+      { map: 517, srv: 'S3', state: 'later', secs: 2540 },
+    ],
+    hunting: [],
+  }[state];
+
+  const clock = s => s >= 3600
+    ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+    : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  const strip = document.getElementById('strip');
+  const pct = Math.round(stats.done / stats.total * 100);
+  strip.innerHTML = `
+    <span class="badge">${stats.badge}</span>
+    <span class="progress"><b>${stats.done}</b><span class="muted">/ ${stats.total} finished</span>
+      <span class="bar"><i style="width:${pct}%"></i></span></span>
+    ${stats.rank ? `<span class="sep"></span><span><span class="muted">Rank</span> <b>#${stats.rank}</b></span>` : ''}
+    ${stats.wr != null ? `<span class="sep"></span><span><b>${stats.wr}</b> <span class="muted">WR</span></span>` : ''}
+    <span class="overall"><b>${stats.overall}</b> <span class="muted">finishes overall</span></span>`;
+
+  const next = document.getElementById('next');
+  if (rows.length === 0) next.classList.add('hidden');
+
+  function render() {
+    document.getElementById('rows').innerHTML = rows.map(r => {
+      const cls = r.state === 'live' ? 'live' : r.state === 'next' ? 'nexts' : 'later';
+      const when = r.state === 'live'
+        ? `<small>live</small>${clock(r.secs)} left`
+        : `<small>in</small>${clock(r.secs)}`;
+      return `<div class="row ${cls}${r.alert ? ' alerting' : ''}">
+        <span class="dot"></span><span class="map">#${r.map}</span>
+        <span class="srv">${r.srv}</span><span class="when">${when}</span></div>`;
+    }).join('');
+  }
+  render();
+  // Counts down like the real overlay would between polls.
+  setInterval(() => { rows.forEach(r => { if (r.secs > 0) r.secs--; }); render(); }, 1000);
+</script>
+</body>
+</html>
