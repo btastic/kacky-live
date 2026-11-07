@@ -7,7 +7,8 @@
   Static mockup for the overlay spec (docs/specs/overlay-mvp.md). Not app code.
 
   Query params:
-    state = live (default) | hunting | alert
+    widget = schedule | progress; unset shows both on the full 1920x1080 layer
+    state  = live (default) | hunting | alert
     bg    = optional image URL shown behind the overlay, for local previews only
     plain = 1 shows a neutral backdrop instead of transparency
 -->
@@ -99,6 +100,11 @@
   .alerting .when { color: var(--accent); font-weight: 700; }
 
   .hidden { display: none; }
+
+  /* One widget per browser source: the widget sits in the top-left corner and the source is sized
+     to it in OBS, so the streamer places each widget on its own. */
+  html.single, html.single body { width: 100vw; height: 100vh; }
+  html.single .panel { left: 0; top: 0; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -113,6 +119,8 @@
 <script>
   const params = new URLSearchParams(location.search);
   const state = params.get('state') || 'live';
+  const widget = params.get('widget');
+  if (widget) document.documentElement.classList.add('single');
   if (params.get('bg')) document.body.style.backgroundImage = `url("${params.get('bg')}")`;
   else if (params.get('plain') === '1') document.body.classList.add('plain');
 
@@ -128,6 +136,7 @@
       { map: 464, srv: 'S8', state: 'live',  secs: 252 },
       { map: 503, srv: 'S7', state: 'next',  secs: 580 },
       { map: 486, srv: 'S1', state: 'later', secs: 1865 },
+      { map: 517, srv: 'S3', state: 'later', secs: 3092 },
     ],
     alert: [
       { map: 503, srv: 'S7', state: 'next',  secs: 28, alert: true },
@@ -152,7 +161,8 @@
     <span class="overall"><b>${stats.overall}</b> <span class="muted">finishes overall</span></span>`;
 
   const next = document.getElementById('next');
-  if (rows.length === 0) next.classList.add('hidden');
+  if (rows.length === 0 || widget === 'progress') next.classList.add('hidden');
+  if (widget === 'schedule') strip.classList.add('hidden');
 
   function render() {
     document.getElementById('rows').innerHTML = rows.map(r => {

@@ -40,9 +40,20 @@ The overlay never assumes a server count (it changes during an edition, e.g. 15 
 
 ### Placement
 
-The page is a transparent `1920x1080` canvas with compact widgets, designed to look right at 1080p.
-Where they end up is the streamer's choice: OBS already positions, crops and scales a browser
-source. The overlay does not try to fit every streamer's layout.
+There is no layout that fits every streamer. Some have their camera top right, some top left;
+some keep chat on the left, some on the right; some moved Kontrol's HUD, some did not. So the
+overlay does not pick a layout. Each widget has its own URL (`?widget=schedule`,
+`?widget=progress`, see 4) and becomes its own browser source, which the streamer positions and
+scales in OBS on its own. Widgets are designed to look right at 1080p.
+
+Without `widget`, the page shows both widgets on one transparent `1920x1080` layer, for streamers
+happy with the default layout.
+
+Why not one URL and OBS cropping: OBS can show the same browser source twice, each copy cropped
+to one widget (*Add → Existing*, then crop with Alt+drag). But the widgets change size (the strip
+is shorter in hunting, the list follows the number of favourites), so a crop either cuts content
+or needs slack, and few streamers know the feature. One URL per widget is what streamers already
+do for alerts and chat.
 
 ## 2. Widgets
 
@@ -109,6 +120,13 @@ illustrative numbers. The page is transparent; the grey backdrop only stands in 
 
 ![Alert](mockup/overlay-alert.png)
 
+**One widget per browser source** (`?widget=schedule` at 400 × 250, `?widget=progress` at
+800 × 52, transparent as OBS gets them):
+
+![Schedule widget](mockup/widget-schedule.png)
+
+![Progress widget](mockup/widget-progress.png)
+
 ## 3. Data
 
 ### 3.1 Public endpoints (no key)
@@ -167,15 +185,30 @@ All favourite types are included. Unlike `!nextmaps`, there is no type filter.
 ## 4. URL
 
 ```text
-/overlay?player=842#key=kgg_...
+/overlay?widget=schedule&player=842#key=kgg_...   → Up next
+/overlay?widget=progress&player=842                → Stats strip, no key needed
+/overlay?player=842#key=kgg_...                   → both, on the full 1920x1080 layer
 ```
 
 | Param | Required | Default | Rule |
 |---|---|---|---|
+| `widget` | no | both | `schedule` or `progress`. Unknown value → transparent page |
 | `player` | yes | – | KackyGG player id, picked on `/config` by name or login |
 | `count` | no | `4` | 1–10. Rarely needed; the default fits the panel |
 | `edition` | no | detected | Hunting only, e.g. `KR6`. Overrides the detected edition (proposal) |
-| `key` (fragment) | no | – | Without it, only the stats strip shows |
+| `key` (fragment) | no | – | Needed for `schedule` only. Without it, Up next stays hidden |
+
+A single-widget page draws its widget in the top-left corner with no margin, so the browser
+source can be sized to it. Recommended OBS browser source sizes:
+
+| Widget | Width × height | Notes |
+|---|---|---|
+| `schedule` | `400 × 250` | Fits the default 4 rows; add about 48 px per extra row |
+| `progress` | `800 × 52` | The strip is left-aligned and shorter in hunting |
+| both | `1920 × 1080` | |
+
+The `/config` page ([#10](https://github.com/kacky-code/kacky-live/issues/10)) generates both URLs
+and shows these sizes next to them.
 
 The key sits in the URL fragment, so browsers never send it to the overlay host. OBS loads the
 page without the key. The page's JavaScript then reads it from `location.hash` and calls the API
@@ -223,5 +256,8 @@ Never render error text, status codes or stack traces.
 
 ## Open Questions
 
-1. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
+1. **One URL per widget:** Is `?widget=schedule` / `?widget=progress` the right split, and should
+   the combined page stay? Streamer layouts differ too much for one fixed layout (see 1,
+   Placement).
+2. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
    hunters care about something else?

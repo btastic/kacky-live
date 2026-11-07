@@ -25,12 +25,14 @@ Runs entirely in the browser on top of the KackyGG API ([`docs/API-NOTES.md`](do
 A `1920x1080` transparent browser source for OBS, configured via URL parameters:
 
 ```text
-https://<host>/overlay?player=<player-id>#key=<overlay-key>
+https://<host>/overlay?widget=schedule&player=<player-id>#key=<overlay-key>
+https://<host>/overlay?widget=progress&player=<player-id>
 ```
 
+- `widget` (optional): `schedule` or `progress`. Each widget is its own browser source, so streamers place them independently around their camera, chat and Kontrol HUD. Without it, both widgets show on one 1920x1080 layer.
 - `player` (required): The streamer's KackyGG player id, picked by name on the `/config` page.
 - `count` (optional): How many maps to show, 1–10. Default: 4.
-- `key` (optional, after `#`): The streamer's read-only overlay key. Without it, only the stats strip shows. Being after `#`, it is never sent to the overlay host.
+- `key` (after `#`, schedule only): The streamer's read-only overlay key. The progress widget needs none. Being after `#`, it is never sent to the overlay host.
 
 ```text
 +------------------------------+
