@@ -26,10 +26,16 @@ noise. The streamer marks maps as favourites in game (Kontrol), with a type: `ge
 | Phase | Example | Overlay |
 |---|---|---|
 | Live edition | KR7, `id 26`, type `KR` | Stats + up next |
-| Hunting | `id 99`, type `KRHX` | Stats only. Hunting servers play by vote, so there is no schedule. |
+| Hunting | `id 99`, type `KRHX` | Stats only, for the edition being hunted (proposal, see 2). Hunting servers play by vote, so there is no schedule. |
 | Between events | – | Overall stats only, or hidden |
 
 The overlay never assumes a server count (it changes during an edition, e.g. 15 early, 10 later).
+
+### Placement
+
+The page is a transparent `1920x1080` canvas with compact widgets, designed to look right at 1080p.
+Where they end up is the streamer's choice: OBS already positions, crops and scales a browser
+source. The overlay does not try to fit every streamer's layout.
 
 ## 2. Widgets
 
@@ -58,7 +64,22 @@ KR7 · 51 / 75 finished · rank #3 · 2 WR        898 finishes overall
 ```
 
 - Event finishes, map count, event rank, world records, overall finishes.
-- During hunting or between events, only overall finishes.
+- Between events, only overall finishes.
+
+**Hunting (proposal):** When the streamer grinds a map from an older edition, show their
+finishes in that edition next to the overall total:
+
+```text
+Hunting KR6 · 60 / 75 finished                 898 finishes overall
+```
+
+- Finishes in the edition: `GET /players/{id}/records?eventId={edition id}` (rows with
+  `isFinished`); KR6 is event `11`.
+- The edition comes from the map number: each edition covers a fixed range (KR6 `#376–#450`,
+  KR7 `#451–#525`), listed by `GET /maps?eventId={id}`.
+- The current map would come from the server the streamer is on (`serverLogin` on
+  `GET /players/{id}`). Not verified yet: the field was empty during the live phase. Fallback: the
+  streamer sets the edition in the URL (`&edition=KR6`).
 
 ## 3. Data
 
@@ -125,6 +146,7 @@ X-Api-Key: kgg_...
 | `player` | yes | – | KackyGG player id, picked on `/config` by name or login |
 | `types` | no | all | Passed through to the endpoint |
 | `count` | no | `4` | 1–10 |
+| `edition` | no | detected | Hunting only, e.g. `KR6`. Overrides the detected edition (proposal) |
 | `key` (fragment) | no | – | Without it, only the stats strip shows |
 
 The key sits in the URL fragment, so browsers never send it to the overlay host. OBS loads the
@@ -171,7 +193,8 @@ Never render error text, status codes or stack traces.
 
 ## Open Questions
 
-1. **Placement:** Where should the two widgets sit? Kontrol takes the top left; streamers often
-   keep webcam and chat on the right.
-2. **Stats strip in hunting:** Is overall finishes enough, or is there a hunting stat worth
-   showing?
+1. **Hunting: current map.** Is `serverLogin` on `GET /players/{id}` filled while a player is
+   connected to a hunting server? If yes, the hunted edition is detected automatically; if not, the
+   streamer sets `&edition=` in the URL.
+2. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
+   hunters care about something else?
