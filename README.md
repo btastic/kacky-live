@@ -68,6 +68,7 @@ Once the OBS overlay is proven on live streams, Phase 2 reuses the same client l
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) – Workflow and PR guidelines.
 - [`docs/API-NOTES.md`](docs/API-NOTES.md) – Public KackyGG `/v1` endpoints, fields, and polling intervals.
 - [`docs/SPEC-TEMPLATE.md`](docs/SPEC-TEMPLATE.md) – Structure for layout and widget specs.
+- [`docs/specs/overlay-mvp.md`](docs/specs/overlay-mvp.md) – Phase 1 overlay spec (proposal for #1).
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) – Community guidelines.
 
 ## Contributing
