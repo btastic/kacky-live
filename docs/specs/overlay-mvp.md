@@ -77,9 +77,13 @@ Hunting KR6 · 60 / 75 finished                 898 finishes overall
   `isFinished`); KR6 is event `11`.
 - The edition comes from the map number: each edition covers a fixed range (KR6 `#376–#450`,
   KR7 `#451–#525`), listed by `GET /maps?eventId={id}`.
-- The current map would come from the server the streamer is on (`serverLogin` on
-  `GET /players/{id}`). Not verified yet: the field was empty during the live phase. Fallback: the
-  streamer sets the edition in the URL (`&edition=KR6`).
+- The current map comes from the server the streamer is on: `serverLogin` on `GET /players/{id}`,
+  then that server's `currentMap` in `GET /servers/live`. KackyGG sets `serverLogin` on
+  `player.connect` for every server, hunting included, and clears it on `player.disconnect`; the
+  streamer listing relies on the same field (KackyGG `6348091a`).
+- A crashed server sends no disconnect, so `serverLogin` can be stale, and private servers are not
+  in `/servers/live`. If the server is not in that list, the current map is unknown and the
+  overlay falls back to `&edition=KR6` from the URL, else hides the edition part.
 
 ## 3. Data
 
@@ -193,8 +197,5 @@ Never render error text, status codes or stack traces.
 
 ## Open Questions
 
-1. **Hunting: current map.** Is `serverLogin` on `GET /players/{id}` filled while a player is
-   connected to a hunting server? If yes, the hunted edition is detected automatically; if not, the
-   streamer sets `&edition=` in the URL.
-2. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
+1. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
    hunters care about something else?
