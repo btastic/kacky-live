@@ -8,7 +8,7 @@
 
   Query params:
     widget = schedule | progress; unset shows both on the full 1920x1080 layer
-    state  = live (default) | hunting | alert
+    state  = live (default) | hunting | alert | overlap
     bg    = optional image URL shown behind the overlay, for local previews only
     plain = 1 shows a neutral backdrop instead of transparency
 -->
@@ -99,6 +99,23 @@
   .alerting { outline: 2px solid var(--accent); background: rgba(255, 120, 0, 0.16); }
   .alerting .when { color: var(--accent); font-weight: 700; }
 
+  /* A favourite the streamer already finished: still listed until they unfav it, but dimmed. */
+  .finished { opacity: 0.45; }
+  .finished .map::after { content: " ✓"; font-weight: 400; color: var(--live); }
+
+  /* Favourites that start at the same moment (servers in one sync group switch together). */
+  .group {
+    position: relative;
+    margin: 4px 0;
+    padding: 22px 0 2px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 8px;
+  }
+  .group > .cap {
+    position: absolute; left: 10px; top: 3px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted);
+  }
+
   .hidden { display: none; }
 
   /* One widget per browser source: the widget sits in the top-left corner and the source is sized
@@ -128,6 +145,7 @@
   const stats = {
     live:    { badge: 'KR7', done: 51, total: 75, rank: 3, wr: 2, overall: 898 },
     alert:   { badge: 'KR7', done: 51, total: 75, rank: 3, wr: 2, overall: 898 },
+    overlap: { badge: 'KR7', done: 51, total: 75, rank: 3, wr: 2, overall: 898 },
     hunting: { badge: 'HUNTING KR6', done: 60, total: 75, overall: 898 },
   }[state];
 
@@ -135,8 +153,14 @@
     live: [
       { map: 464, srv: 'S8', state: 'live',  secs: 252 },
       { map: 503, srv: 'S7', state: 'next',  secs: 580 },
-      { map: 486, srv: 'S1', state: 'later', secs: 1865 },
+      { map: 486, srv: 'S1', state: 'later', secs: 1865, finished: true },
       { map: 517, srv: 'S3', state: 'later', secs: 3092 },
+    ],
+    overlap: [
+      { map: 464, srv: 'S8', state: 'live',  secs: 252 },
+      { map: 503, srv: 'S7', state: 'next',  secs: 580, group: 'same' },
+      { map: 511, srv: 'S9', state: 'next',  secs: 580, group: 'same' },
+      { map: 486, srv: 'S1', state: 'later', secs: 1865 },
     ],
     alert: [
       { map: 503, srv: 'S7', state: 'next',  secs: 28, alert: true },
@@ -164,16 +188,28 @@
   if (rows.length === 0 || widget === 'progress') next.classList.add('hidden');
   if (widget === 'schedule') strip.classList.add('hidden');
 
+  function rowHtml(r) {
+    const cls = r.state === 'live' ? 'live' : r.state === 'next' ? 'nexts' : 'later';
+    const when = r.state === 'live'
+      ? `<small>live</small>${clock(r.secs)} left`
+      : `<small>in</small>${clock(r.secs)}`;
+    return `<div class="row ${cls}${r.alert ? ' alerting' : ''}${r.finished ? ' finished' : ''}">
+      <span class="dot"></span><span class="map">#${r.map}</span>
+      <span class="srv">${r.srv}</span><span class="when">${when}</span></div>`;
+  }
+
   function render() {
-    document.getElementById('rows').innerHTML = rows.map(r => {
-      const cls = r.state === 'live' ? 'live' : r.state === 'next' ? 'nexts' : 'later';
-      const when = r.state === 'live'
-        ? `<small>live</small>${clock(r.secs)} left`
-        : `<small>in</small>${clock(r.secs)}`;
-      return `<div class="row ${cls}${r.alert ? ' alerting' : ''}">
-        <span class="dot"></span><span class="map">#${r.map}</span>
-        <span class="srv">${r.srv}</span><span class="when">${when}</span></div>`;
-    }).join('');
+    // Rows sharing a group start together and are boxed under one caption.
+    let html = '';
+    for (let i = 0; i < rows.length; i++) {
+      const g = rows[i].group;
+      if (!g) { html += rowHtml(rows[i]); continue; }
+      let j = i;
+      while (j + 1 < rows.length && rows[j + 1].group === g) j++;
+      html += `<div class="group"><span class="cap">AT THE SAME TIME</span>${rows.slice(i, j + 1).map(rowHtml).join('')}</div>`;
+      i = j;
+    }
+    document.getElementById('rows').innerHTML = html;
   }
   render();
   // Counts down like the real overlay would between polls.

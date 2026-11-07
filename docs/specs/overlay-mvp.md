@@ -72,7 +72,15 @@ The streamer's favourite maps on the live edition servers, soonest first, at mos
 
 - One row per map: map number, server tag, state and time.
 - States: **live** (time left), **next** on its server, **later** (time until start).
-- A row without a time (server clock unknown) shows `next` or `3 maps away`.
+- A row without a time shows `next` or `3 maps away`. That happens when the server's timing is
+  unknown or stale: KackyGG gives no forecast rather than a wrong one (see 3.2).
+- **Finished favourites** stay listed but dimmed, with a ✓. Players usually unfav a map once they
+  finish it (Kontrol has `/unfav finished`), so a finished favourite stays visible until the
+  streamer removes it.
+- **Favourites at the same time** are boxed together under "at the same time" (proposal, see Open
+  Questions). Servers in one sync group switch maps at the same moment, so two favourites on two
+  servers of a group often start together. Two rows count as the same time when their `startsAt`
+  (or, for live maps, `endsAt`) differ by less than 60 s.
 - No favourite on any server → widget hidden.
 
 ### Stats strip
@@ -105,10 +113,10 @@ Hunting KR6 · 60 / 75 finished                 898 finishes overall
 
 ### Mockup
 
-Rendered from [`mockup/overlay.html`](mockup/overlay.html) (`?state=live|hunting|alert`) with
-illustrative numbers. The page is transparent; the grey backdrop only stands in for the game.
+Rendered from [`mockup/overlay.html`](mockup/overlay.html) (`?state=live|hunting|alert|overlap`)
+with illustrative numbers. The page is transparent; the grey backdrop only stands in for the game.
 
-**Live edition:** stats strip and up next.
+**Live edition:** stats strip and up next. `#486` is already finished, so it is dimmed.
 
 ![Live edition](mockup/overlay-live.png)
 
@@ -127,6 +135,11 @@ illustrative numbers. The page is transparent; the grey backdrop only stands in 
 
 ![Progress widget](mockup/widget-progress.png)
 
+**Favourites at the same time (proposal, for discussion):** `#503` on S7 and `#511` on S9 start
+together, so they share a box.
+
+![Favourites at the same time](mockup/widget-overlap.png)
+
 ## 3. Data
 
 ### 3.1 Public endpoints (no key)
@@ -140,9 +153,20 @@ illustrative numbers. The page is transparent; the grey backdrop only stands in 
 
 ### 3.2 New endpoint (KackyGG, keyed)
 
-The streamer's favourites are private. Their schedule comes from KackyGG's `ServerSchedule`
-(on `dev`), which already powers the `!nextmaps` chat command. It reads every server's full
-playlist from kontrol and adds the time limit plus a 60 s gap per map change.
+The streamer's favourites are private. Their schedule comes from KackyGG's `ServerSchedule`, which
+shipped on `main` with the `!nextmaps` and `!when` chat commands (KackyGG #287) and which streamers
+already use. It reads every edition server's full playlist from kontrol (`server.sync`) and
+forecasts when each map plays. Favourites themselves are stored in KackyGG: kontrol's `/fav` and
+`/unfav` write them through `POST`/`DELETE /favorites/{login}`.
+
+The endpoint reuses `ServerSchedule` as it is, with no timing logic of its own:
+
+- **Known timing bugs:** extend votes inflate queued maps, and a failed `server.sync` looks like an
+  empty answer. The planned fix (KackyGG `.agents/handoffs/next-maps-timing.md`) forecasts synced
+  servers from their schedule clock and drops stale data. Because the endpoint shares the code,
+  that fix corrects the overlay too. Until then the overlay shows what `!nextmaps` shows.
+- **Stale data:** the fix's rule is *"stale data gives no forecast, never a wrong time."* The
+  endpoint passes that through as `startsAt: null`, and the overlay shows the row without a time.
 
 ```text
 GET /v1/overlay/nextmaps?count=4
@@ -164,11 +188,12 @@ All favourite types are included. Unlike `!nextmaps`, there is no type filter.
       "mapNumber": 464,
       "mapUid": "…",
       "favoriteType": "generic",  // the streamer's marker, passed through, never filtered
+      "finished": false,          // the streamer has an online finish on this map → row dimmed
       "family": "KR",
       "server": { "login": "…", "tag": "S8" },
       "state": "live",            // live | next | later
       "position": -1,             // -1 live, 0 next, 1+ later
-      "startsAt": null,           // estimated; null when live or unknown
+      "startsAt": null,           // estimated; null when live, unknown or stale
       "endsAt": "2026-11-07T14:44:12Z"
     }
   ]
@@ -242,16 +267,24 @@ Never render error text, status codes or stack traces.
 
 - Renders at 1920x1080 in OBS with no scrollbars and a transparent background.
 - Countdowns stay right across a 2-minute network outage and resync after.
-- Unit tests: name stripping (incl. `$$`), time format, fallback states, countdown from `endsAt`.
+- Unit tests: name stripping (incl. `$$`), time format, fallback states, countdown from `endsAt`,
+  dimmed finished rows, same-time grouping (incl. the 60 s edge), rows without a time.
 - The key never appears in a request to the overlay host.
 
 ## Later
 
 - **Alert:** a row flashes once when its map is 30 s from starting.
-- **Marker icon:** show the streamer's own Kontrol marker (heart, luck, …) next to a row, as a
-  personal touch for viewers. Display only, never a filter.
-- **Overlapping favourites:** two favourites live or starting within a few minutes of each other
-  on different servers. Decide how to show the clash (grouping, a marker, or order only).
+- **Marker icon:** show the streamer's own Kontrol marker next to a row, as a personal touch for
+  viewers. Display only, never a filter. Use Kontrol's icons and colours (`plugins/api/utils.ts`)
+  so viewers recognise them from the game:
+
+  | Type | Icon | Colour |
+  |---|---|---|
+  | `generic` | ♦ | `#fff` |
+  | `easy` | ♣ | `#3c0` |
+  | `medium` | ★ | `#cc0` |
+  | `hard` | ♥ | `#c00` |
+  | `impossible` | ♠ | `#09f` |
 - **Twitch panel:** the same data for viewers below the stream.
 
 ## Open Questions
@@ -259,5 +292,8 @@ Never render error text, status codes or stack traces.
 1. **One URL per widget:** Is `?widget=schedule` / `?widget=progress` the right split, and should
    the combined page stay? Streamer layouts differ too much for one fixed layout (see 1,
    Placement).
-2. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
+2. **Favourites at the same time:** Is a shared box under "at the same time" the right way to show
+   them (see the mockup)? Alternatives: order only, or a small marker on each row. The question
+   is how often streamers hit it, and whether viewers need the hint at all.
+3. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
    hunters care about something else?
