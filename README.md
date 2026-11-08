@@ -26,12 +26,13 @@ A `1920x1080` transparent browser source for OBS, configured via URL parameters:
 
 ```text
 https://<host>/overlay?widget=schedule&player=<player-id>#key=<overlay-key>
-https://<host>/overlay?widget=progress&player=<player-id>
+https://<host>/overlay?widget=progress&player=<player-id>&stats=progress,milestone,rank
 ```
 
 - `widget` (optional): `schedule` or `progress`. Each widget is its own browser source, so streamers place them independently around their camera, chat and Kontrol HUD. Without it, both widgets show on one 1920x1080 layer.
 - `player` (required): The streamer's KackyGG player id, picked by name on the `/config` page.
 - `count` (optional): How many maps to show, 1–10. Default: 4.
+- `stats` (optional): Which stats the strip shows, in this order: `progress`, `milestone`, `rank`, `avg`, `wr`. Default: `progress,milestone,rank`.
 - `key` (after `#`, schedule only): The streamer's read-only overlay key. The progress widget needs none. Being after `#`, it is never sent to the overlay host.
 
 ```text
@@ -42,15 +43,15 @@ https://<host>/overlay?widget=progress&player=<player-id>
 | #486  S1   in 31:05          |
 +------------------------------+
 
-KR7 · 51 / 75 finished · rank #3 · 2 WR        898 finishes overall
+KR7  51 / 75 ━━━━━━  Silver · 9 to Gold  Rank #3
 ```
 
 #### Widgets
 
 - **Up next:** The streamer's favourite maps on the live edition servers, soonest first, with server and countdown. Streamers mark the maps of their current rotation as favourites in Kontrol, so the list stays short. Every favourite counts, whatever marker it has, and there is nothing to configure.
-- **Stats strip:** Maps finished in the current event, event rank, world records, and overall finishes.
+- **Stats strip:** The streamer's progress in the current event, with the stats they pick: finished maps, the next milestone (Plastic, Bronze, Silver, Gold, Kacky), leaderboard rank, average rank and world records.
 
-During hunting, maps play in the order players vote for, so there is no schedule: the overlay shows the stats strip only.
+During hunting, servers are jukeboxed only a few maps ahead, so there is no schedule: the overlay shows the stats strip for the hunting event only.
 
 #### Stream-Safe by Design
 

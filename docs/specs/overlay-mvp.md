@@ -4,7 +4,7 @@ Status: **Proposal** for [#1](https://github.com/kacky-code/kacky-live/issues/1)
 five-widget wireframe.
 
 Checked against the production API and KackyGG `dev` on 2026-11-07, during the live phase of
-Kacky Reloaded 7 (event `26`).
+Kacky Reloaded 7 (event `26`). Revised on 2026-11-08 after the first review.
 
 ## 1. Context & Surface
 
@@ -33,10 +33,21 @@ beyond marking maps in game.
 | Phase | Example | Overlay |
 |---|---|---|
 | Live edition | KR7, `id 26`, type `KR` | Stats + up next |
-| Hunting | `id 99`, type `KRHX` | Stats only, for the edition being hunted (proposal, see 2). Hunting servers play by vote, so there is no schedule. |
-| Between events | – | Overall stats only, or hidden |
+| Hunting | KR hunting `id 99` (`KRHX`), KX hunting `id 200` (`KXHX`) | Stats for the hunting event. No up next: hunting servers have every map of the family and are jukeboxed only 0–3 maps ahead, so there is no schedule to show. |
 
-The overlay never assumes a server count (it changes during an edition, e.g. 15 early, 10 later).
+The overlay never assumes a server count (it changes during an edition, e.g. 15 early, 10 later)
+and never hardcodes an event id.
+
+**Which event the stats use**, first match wins:
+
+1. The streamer is on a public server: that server's `eventId` (`serverLogin` on
+   `GET /players/{id}`, then the row in `GET /servers/live`). This picks the edition or the right
+   hunting event by itself. KackyGG sets `serverLogin` on `player.connect` for every server and
+   clears it on `player.disconnect`. A crashed server can leave it stale, so a server missing from
+   `/servers/live` does not count.
+2. A live edition is running: `GET /events/active`.
+3. Otherwise the active hunting event of `family` (default `KR`): the active event of type
+   `{family}HX` in `GET /events`. Editions point to it through `contributesToEventId`.
 
 ### Placement
 
@@ -86,30 +97,26 @@ The streamer's favourite maps on the live edition servers, soonest first, at mos
 ### Stats strip
 
 ```text
-KR7 · 51 / 75 finished · rank #3 · 2 WR        898 finishes overall
+KR7      51 / 75 ━━━━━━━━━━   Silver · 9 to Gold   Rank #3   Avg 230
+HUNTING  193 / 450 ━━━━━━━━   Bronze · 47 to Silver   Rank #160   Avg 139
 ```
 
-- Event finishes, map count, event rank, world records, overall finishes.
-- Between events, only overall finishes.
+A badge with the event (`KR7`, `HUNTING`), then the stats the streamer picks, in the order they
+pick them (`stats=`, see 4). All of them are for the event chosen in 1 (Event phases):
 
-**Hunting (proposal):** When the streamer grinds a map from an older edition, show their
-finishes in that edition next to the overall total:
+| Stat | Shows | Source |
+|---|---|---|
+| `progress` | Finished maps of the event, with a bar | `mapBreakdown.progress.completed` / `.total` |
+| `milestone` | Current tier and finishes to the next one | `mapBreakdown.progress.currentTier` and `.thresholds` |
+| `rank` | Leaderboard position | `rank` in the leaderboard |
+| `avg` | Average rank on finished maps (to confirm, see Open Questions) | `averageRankFinishedMaps` in the leaderboard |
+| `wr` | World records | `worldRecords` in the leaderboard |
 
-```text
-Hunting KR6 · 60 / 75 finished                 898 finishes overall
-```
-
-- Finishes in the edition: `GET /players/{id}/records?eventId={edition id}` (rows with
-  `isFinished`); KR6 is event `11`.
-- The edition comes from the map number: each edition covers a fixed range (KR6 `#376–#450`,
-  KR7 `#451–#525`), listed by `GET /maps?eventId={id}`.
-- The current map comes from the server the streamer is on: `serverLogin` on `GET /players/{id}`,
-  then that server's `currentMap` in `GET /servers/live`. KackyGG sets `serverLogin` on
-  `player.connect` for every server, hunting included, and clears it on `player.disconnect`; the
-  streamer listing relies on the same field (KackyGG `6348091a`).
-- A crashed server sends no disconnect, so `serverLogin` can be stale, and private servers are not
-  in `/servers/live`. If the server is not in that list, the current map is unknown and the
-  overlay falls back to `&edition=KR6` from the URL, else hides the edition part.
+- Default: `progress,milestone,rank`.
+- **Milestones** are the tiers Plastic, Bronze, Silver, Gold and Kacky. Their thresholds depend on
+  the event's map count (KR7: 10 / 25 / 40 / 60 / 75; KR hunting: 60 / 140 / 240 / 360 / 450) and
+  always come from the API. At the top tier the stat shows the tier alone.
+- Overall finishes across all events are not shown: they mean little on stream.
 
 ### Mockup
 
@@ -120,7 +127,7 @@ with illustrative numbers. The page is transparent; the grey backdrop only stand
 
 ![Live edition](mockup/overlay-live.png)
 
-**Hunting:** stats for the hunted edition, no schedule.
+**Hunting:** stats for the hunting event, no schedule.
 
 ![Hunting](mockup/overlay-hunting.png)
 
@@ -129,11 +136,15 @@ with illustrative numbers. The page is transparent; the grey backdrop only stand
 ![Alert](mockup/overlay-alert.png)
 
 **One widget per browser source** (`?widget=schedule` at 400 × 250, `?widget=progress` at
-800 × 52, transparent as OBS gets them):
+900 × 52, transparent as OBS gets them):
 
 ![Schedule widget](mockup/widget-schedule.png)
 
 ![Progress widget](mockup/widget-progress.png)
+
+**Custom stats:** `?widget=progress&stats=milestone,rank,avg,wr`
+
+![Progress widget with custom stats](mockup/widget-progress-custom.png)
 
 **Favourites at the same time (proposal, for discussion):** `#503` on S7 and `#511` on S9 start
 together, so they share a box.
@@ -146,10 +157,14 @@ together, so they share a box.
 
 | Data | Endpoint | Fields | Poll |
 |---|---|---|---|
-| Active event | `GET /events/active` | `id`, `name`, `eventType`, `endTime` | 60 s |
-| Event rank, WRs | `GET /leaderboard?eventId={id}&search={nickname}` | `rank`, `finishCount`, `worldRecords` | 60 s |
-| Overall finishes | `GET /players/{id}/stats` | `overall.totalFinishes`, `currentEvent.finishes` | 60 s |
-| Map count | `GET /maps?eventId={id}&limit=1` | `meta.total` | On event change |
+| Streamer's server | `GET /players/{id}`, `GET /servers/live` | `serverLogin`; the server's `eventId` | 20 s |
+| Active edition | `GET /events/active` | `id`, `name`, `eventType` | 60 s |
+| Hunting event | `GET /events` | active event of type `{family}HX` | 60 s |
+| Progress, milestones | `GET /players/{id}/stats?eventId={id}&includeMapBreakdown=true` | `mapBreakdown.progress` | 60 s |
+| Rank, avg, WRs | `GET /leaderboard?eventId={id}&search={nickname}` | the row whose `playerId` matches | 60 s |
+
+The leaderboard search matches names, so it can return more than one row; the overlay keeps the
+one with the streamer's `playerId`.
 
 ### 3.2 New endpoint (KackyGG, keyed)
 
@@ -158,6 +173,11 @@ shipped on `main` with the `!nextmaps` and `!when` chat commands (KackyGG #287) 
 already use. It reads every edition server's full playlist from kontrol (`server.sync`) and
 forecasts when each map plays. Favourites themselves are stored in KackyGG: kontrol's `/fav` and
 `/unfav` write them through `POST`/`DELETE /favorites/{login}`.
+
+**Edition servers only.** `ServerSchedule` leaves hunting servers out on purpose: they hold every
+map of the family and are jukeboxed only 0–3 maps ahead, so their playlist says nothing about
+what plays when. During hunting the endpoint returns `edition: null` with no maps, and Up next
+stays hidden.
 
 The endpoint reuses `ServerSchedule` as it is, with no timing logic of its own:
 
@@ -188,6 +208,7 @@ All favourite types are included. Unlike `!nextmaps`, there is no type filter.
       "mapNumber": 464,
       "mapUid": "…",
       "favoriteType": "generic",  // the streamer's marker, passed through, never filtered
+      "marker": { "icon": "♦", "color": "fff" },   // later, see Later: Marker icon
       "finished": false,          // the streamer has an online finish on this map → row dimmed
       "family": "KR",
       "server": { "login": "…", "tag": "S8" },
@@ -211,7 +232,7 @@ All favourite types are included. Unlike `!nextmaps`, there is no type filter.
 
 ```text
 /overlay?widget=schedule&player=842#key=kgg_...   → Up next
-/overlay?widget=progress&player=842                → Stats strip, no key needed
+/overlay?widget=progress&player=842&stats=progress,milestone,rank   → Stats strip, no key
 /overlay?player=842#key=kgg_...                   → both, on the full 1920x1080 layer
 ```
 
@@ -220,7 +241,8 @@ All favourite types are included. Unlike `!nextmaps`, there is no type filter.
 | `widget` | no | both | `schedule` or `progress`. Unknown value → transparent page |
 | `player` | yes | – | KackyGG player id, picked on `/config` by name or login |
 | `count` | no | `4` | 1–10. Rarely needed; the default fits the panel |
-| `edition` | no | detected | Hunting only, e.g. `KR6`. Overrides the detected edition (proposal) |
+| `stats` | no | `progress,milestone,rank` | Stats strip content and order, from `progress`, `milestone`, `rank`, `avg`, `wr`. Unknown names are skipped |
+| `family` | no | `KR` | Which hunting event to use when the streamer is not on a public server (`KR`, `KX`) |
 | `key` (fragment) | no | – | Needed for `schedule` only. Without it, Up next stays hidden |
 
 A single-widget page draws its widget in the top-left corner with no margin, so the browser
@@ -229,11 +251,11 @@ source can be sized to it. Recommended OBS browser source sizes:
 | Widget | Width × height | Notes |
 |---|---|---|
 | `schedule` | `400 × 250` | Fits the default 4 rows; add about 48 px per extra row |
-| `progress` | `800 × 52` | The strip is left-aligned and shorter in hunting |
+| `progress` | `900 × 52` | The strip is left-aligned; its width follows the chosen stats |
 | both | `1920 × 1080` | |
 
-The `/config` page ([#10](https://github.com/kacky-code/kacky-live/issues/10)) generates both URLs
-and shows these sizes next to them.
+The `/config` page ([#10](https://github.com/kacky-code/kacky-live/issues/10)) generates both URLs,
+offers the stats as checkboxes the streamer can reorder, and shows these sizes next to them.
 
 The key sits in the URL fragment, so browsers never send it to the overlay host. OBS loads the
 page without the key. The page's JavaScript then reads it from `location.hash` and calls the API
@@ -248,6 +270,9 @@ OBS settings, which is why it is read-only.
 - **Nicknames:** The game shows `customNickname` (e.g. `Worel` for `TheWoreL`). Show it stripped,
   fall back to `nickname`.
 - **Times:** `m:ss`, `h:mm:ss` past an hour, as the chat commands do.
+- **Nothing the game defines is hardcoded.** Event ids, milestone tiers and thresholds, marker
+  icons and colours all change, so they come from the API. The overlay only knows the names it
+  displays them by.
 - **Visuals:** Dark translucent panels, tabular numerals, no motion except the value changes.
 
 ## 6. UI States & Fallbacks
@@ -257,7 +282,8 @@ OBS settings, which is why it is read-only.
 | Loading | Hidden | Hidden |
 | Error / offline | Keep last good, keep counting down | Keep last good |
 | No key / bad key | Hidden | Shown |
-| No edition running | Hidden | Overall finishes only |
+| Hunting | Hidden | Hunting event stats |
+| No event found | Hidden | Hidden |
 | No favourite on a server | Hidden | Shown |
 | 5 min without a good response | Hidden | Hidden |
 
@@ -268,23 +294,18 @@ Never render error text, status codes or stack traces.
 - Renders at 1920x1080 in OBS with no scrollbars and a transparent background.
 - Countdowns stay right across a 2-minute network outage and resync after.
 - Unit tests: name stripping (incl. `$$`), time format, fallback states, countdown from `endsAt`,
-  dimmed finished rows, same-time grouping (incl. the 60 s edge), rows without a time.
+  dimmed finished rows, same-time grouping (incl. the 60 s edge), rows without a time, event
+  choice (server, edition, hunting family), `stats=` parsing and order, milestone at the top tier.
 - The key never appears in a request to the overlay host.
 
 ## Later
 
 - **Alert:** a row flashes once when its map is 30 s from starting.
 - **Marker icon:** show the streamer's own Kontrol marker next to a row, as a personal touch for
-  viewers. Display only, never a filter. Use Kontrol's icons and colours (`plugins/api/utils.ts`)
-  so viewers recognise them from the game:
-
-  | Type | Icon | Colour |
-  |---|---|---|
-  | `generic` | ♦ | `#fff` |
-  | `easy` | ♣ | `#3c0` |
-  | `medium` | ★ | `#cc0` |
-  | `hard` | ♥ | `#c00` |
-  | `impossible` | ♠ | `#09f` |
+  viewers. Display only, never a filter. Icons and colours change, so the endpoint delivers them
+  (`marker`) and the overlay never hardcodes them. Today they only exist in Kontrol's code
+  (`plugins/api/utils.ts`, e.g. ♦ for `generic`, ♥ for `hard`), so KackyGG needs a source for them
+  first. Decided when the feature is picked up.
 - **Twitch panel:** the same data for viewers below the stream.
 
 ## Open Questions
@@ -295,5 +316,7 @@ Never render error text, status codes or stack traces.
 2. **Favourites at the same time:** Is a shared box under "at the same time" the right way to show
    them (see the mockup)? Alternatives: order only, or a small marker on each row. The question
    is how often streamers hit it, and whether viewers need the hint at all.
-3. **Hunting stats:** Is "finishes in the hunted edition + overall finishes" the right pair, or do
-   hunters care about something else?
+3. **Which average:** Is `avg` the average rank on finished maps (`averageRankFinishedMaps`), or
+   the average time (`average` in `/players/{id}/stats`)?
+4. **Hunting family:** Is `family=KR` as default right, and is the server-first rule enough to
+   pick KX hunting for streamers who hunt KX?
